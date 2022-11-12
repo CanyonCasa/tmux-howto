@@ -11,13 +11,21 @@ On A Raspberry Pi (or debian baed Linux)
 
     sudo apt-get install tmux
 
-Once started a tmux session will run indefinitely. To reconnect after logging out and back in run
+Once started a tmux session will run indefinitely. To reconnect after logging out and back in run:
 
     tmux attach
 
-or if multiple sessions are running run the following:
+Or if multiple sessions are running run the following:
 
     tmux attach-session –t <session_name>
+
+To detach from the session
+
+    <Prefix-hot-key> D
+
+And to kill a session 
+
+    tmux kill-session [-t <target_name>]
 
 ## Autostart Setup
 The following files automatically start tmux sessions on boot for each user having a defined _.tmux.init_ file
@@ -37,11 +45,15 @@ The process uses a systemd service to run the _/usr/local/bin/tmuxuser_ setup sc
     [Install]
     WantedBy=multi-user.target
 
-After defining the service enable it by
+After defining the service update the daemon with
+
+    sudo systemctl daemon-reload
+
+Then enable it to run at boot by
 
     sudo systemctl enable tmux
 
-Then define the /usr/local/bin/tmuxuser script it calls.
+Define the _/usr/local/bin/tmuxuser_ script that the service calls.
 
 ### /usr/local/bin/tmuxuser script
     #!/bin/bash
@@ -62,16 +74,15 @@ Then define the /usr/local/bin/tmuxuser script it calls.
     # start or stop session per user...
     case "$1" in
         start)
-            echo "Starting $SCRIPT service for $USER..."
             for u in ${who[@]}; do
-            su $u -c "$SCRIPT -c /home/$u/.tmux.init"
-            echo "Started: /home/$u/.tmux.init"
+                echo "Starting tmux with /home/$u/.tmux.init"
+                su $u -c "$SCRIPT -c /home/$u/.tmux.init"
             done
             sleep 1
             $0 status
         ;;
         stop)
-            echo "Shutting down $SCRIPT service for $USER..."
+            echo "Shutting down tmux for $USER..."
             su $USER -c "$SCRIPT kill-server"
             $0 status
         ;;
@@ -83,7 +94,7 @@ Then define the /usr/local/bin/tmuxuser script it calls.
 
 Then for each user that wishes to launch a session define the following files. Note: These represent example files only that may be customized as desired. Also note lines may wrap in display and be sure lines terminate with Linux LF characters only and not MS Windows CR-LF sequences.
 
-The _.tmux.init_ file defines the tmux session and the individual windows within for the user. The _.tmux.conf_ defines tmux behavior per each user's personal preferences.
+The _/home/$USER/.tmux.init_ file defines the tmux session and the individual windows within for the user. Customize per user preferences based on the following example. See tmux documentation for session, window, and pane details.
 
 ### ~/.tmux.init
     #!/bin/bash
@@ -119,6 +130,9 @@ The _.tmux.init_ file defines the tmux session and the individual windows within
     # interactive python window
     #/usr/bin/tmux new-window -c /home/$USER/bin -n python@bin '/usr/bin/python; bash -i'
 
+NOTE: Later versions will require executable permissions for _.tmux.init_.
+
+The _/home/$USER/.tmux.conf_ file defines tmux behavior per each user's personal preferences. Customize as desire based on the following. See tmux documentation for configuration details.
 
 ### ~/.tmux.conf
     # tmux configuration 20140522...
@@ -156,8 +170,7 @@ The _.tmux.init_ file defines the tmux session and the individual windows within
     set -g mouse-select-window off \;\
     display 'Mouse: OFF'
 
-## Headless Operation
-After connecting to an SSH session run the _/usr/local/gotmux_ command (defined below) to reconnect to the prior session. To disconnect and return to the login shell use _hot-key-prefix D_ keystroke. Make sure the gotmux script has executable permissions.
+Define the following _gotmux_ (i.e. go tmux or got mux) convenience script to open a user session after login
 
 ### /usr/local/bin/gotmux
     #!/bin/bash
@@ -171,3 +184,17 @@ After connecting to an SSH session run the _/usr/local/gotmux_ command (defined 
     else
         su $who -c "tmux attach-session -t $who"
     fi
+
+
+## Operation
+Once all scripts have been defined reboot or run
+
+    sudo systemctl start tmux
+
+After connecting to an SSH session run simply run 
+
+    gotmux
+
+to connect to your session. 
+
+Use number keys assigned to each window to jump around within a session. To disconnect and return to the login shell use _hot-key-prefix D_ keystroke. Make sure the gotmux script has executable permissions.
